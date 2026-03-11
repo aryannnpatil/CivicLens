@@ -5,6 +5,27 @@ const API = axios.create({
     timeout: 30000, // 30s — AI classification can take time
 });
 
+// Attach admin JWT token if present
+API.interceptors.request.use((config) => {
+    const token = localStorage.getItem('admin_token');
+    if (token) {
+        config.headers.Authorization = `Bearer ${token}`;
+    }
+    return config;
+});
+
+// Redirect to login on 401
+API.interceptors.response.use(
+    (res) => res,
+    (err) => {
+        if (err.response?.status === 401 && window.location.pathname.startsWith('/admin') && !window.location.pathname.includes('/login')) {
+            localStorage.removeItem('admin_token');
+            window.location.href = '/admin/login';
+        }
+        return Promise.reject(err);
+    }
+);
+
 /**
  * Submit a new civic issue report
  * @param {FormData} formData - Must contain: photo (File), longitude, latitude, description (optional)

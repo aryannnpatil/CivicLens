@@ -11,6 +11,7 @@
  * ✅ Responsive — designed thumb-friendly at 375 px
  */
 import { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import MapView from '../components/MapView';
 import { submitTicket } from '../services/api';
@@ -107,8 +108,15 @@ function CitizenReportPage() {
 
             {/* ── Floating Glass Header ── */}
             <header className="fixed top-4 left-4 right-4 z-40">
-                <div className="glass rounded-xl px-4 py-3 flex items-center justify-center">
+                <div className="glass rounded-xl px-4 py-3 flex items-center justify-between">
                     <h1 className="text-lg font-bold tracking-tight">Report a Civic Issue</h1>
+                    <Link
+                        to="/admin/login"
+                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-primary hover:bg-primary/10 transition-colors"
+                    >
+                        <span className="material-symbols-outlined text-[18px]">shield_person</span>
+                        Admin
+                    </Link>
                 </div>
             </header>
 

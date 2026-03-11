@@ -3,7 +3,9 @@ const express = require('express');
 const cors = require('cors');
 
 const ticketRoutes = require('./src/routes/ticketsRoutes');
+const authRoutes = require('./src/routes/authRoutes');
 const { seedTickets } = require('./src/models/ticketStore');
+const { seedAdmin } = require('./src/models/adminStore');
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -24,6 +26,7 @@ app.use(express.urlencoded({ extended: true }));
 // Routes
 // ========================
 app.use('/api', ticketRoutes);
+app.use('/api/auth', authRoutes);
 
 app.get('/health', (req, res) => {
     res.json({ status: 'ok', service: 'civiclens-api' });
@@ -33,6 +36,7 @@ app.get('/health', (req, res) => {
 // Start Server (Phase 1: In-memory data only)
 // ========================
 seedTickets();
+seedAdmin();
 
 app.listen(PORT, () => {
     console.log('🚀 Server running with in-memory ticket data');

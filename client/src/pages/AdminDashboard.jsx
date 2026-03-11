@@ -10,9 +10,11 @@
  * ✅ Liquid glass UI design
  */
 import { useState, useEffect, useCallback, useMemo } from "react";
+import { useNavigate } from "react-router-dom";
 import toast from "react-hot-toast";
 import MapView, { severityColor } from "../components/MapView";
 import { getTickets, updateTicketStatus } from "../services/api";
+import { useAuth } from "../context/AuthContext";
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
@@ -83,6 +85,8 @@ function Icon({ name, className = "" }) {
 // ─── AdminDashboard ───────────────────────────────────────────────────────────
 
 function AdminDashboard() {
+  const { logout } = useAuth();
+  const navigate = useNavigate();
   const [tickets, setTickets] = useState([]);
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -229,6 +233,13 @@ function AdminDashboard() {
                   className="text-primary text-[20px]"
                 />
               </div>
+              <button
+                onClick={() => { logout(); navigate('/admin/login', { replace: true }); }}
+                className="liquid-glass p-2 rounded-lg hover:bg-red-50 transition-colors flex items-center justify-center"
+                title="Logout"
+              >
+                <Icon name="logout" className="text-red-500" />
+              </button>
             </div>
           </div>
         </div>

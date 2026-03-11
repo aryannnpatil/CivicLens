@@ -1,39 +1,30 @@
-import { BrowserRouter } from 'react-router-dom';
-import { useState } from 'react';
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
+import { AuthProvider } from './context/AuthContext';
 import CitizenReportPage from './pages/CitizenReportPage';
 import AdminDashboard from './pages/AdminDashboard';
+import AdminLogin from './pages/AdminLogin';
+import ProtectedRoute from './components/ProtectedRoute';
 
 function App() {
-    const [view, setView] = useState('citizen'); // 'citizen' | 'admin'
-
     return (
         <BrowserRouter>
-            <Toaster position="top-center" toastOptions={{ duration: 3500 }} />
-            {/* Hardcoded View Toggle — No Auth */}
-            <div className="fixed top-5 right-6 z-50 flex liquid-glass rounded-xl overflow-hidden">
-                <button
-                    onClick={() => setView('citizen')}
-                    className={`px-5 py-2.5 text-sm font-medium transition-colors ${view === 'citizen'
-                            ? 'bg-primary text-white shadow-lg shadow-primary/20'
-                            : 'text-slate-600 hover:bg-white/60'
-                        }`}
-                >
-                    🏠 Citizen
-                </button>
-                <button
-                    onClick={() => setView('admin')}
-                    className={`px-5 py-2.5 text-sm font-medium transition-colors ${view === 'admin'
-                            ? 'bg-primary text-white shadow-lg shadow-primary/20'
-                            : 'text-slate-600 hover:bg-white/60'
-                        }`}
-                >
-                    🛡️ Admin
-                </button>
-            </div>
-
-            {/* Conditional Rendering based on toggle */}
-            {view === 'citizen' ? <CitizenReportPage /> : <AdminDashboard />}
+            <AuthProvider>
+                <Toaster position="top-center" toastOptions={{ duration: 3500 }} />
+                <Routes>
+                    <Route path="/" element={<CitizenReportPage />} />
+                    <Route path="/admin/login" element={<AdminLogin />} />
+                    <Route
+                        path="/admin"
+                        element={
+                            <ProtectedRoute>
+                                <AdminDashboard />
+                            </ProtectedRoute>
+                        }
+                    />
+                    <Route path="*" element={<Navigate to="/" replace />} />
+                </Routes>
+            </AuthProvider>
         </BrowserRouter>
     );
 }
