@@ -1,4 +1,4 @@
-/**
+﻿/**
  * CitizenReportPage — Liquid Glass Design
  *
  * Features:
@@ -10,13 +10,14 @@
  * ✅ Success / error feedback via react-hot-toast
  * ✅ Responsive — designed thumb-friendly at 375 px
  */
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import MapView from '../components/MapView';
 import { submitTicket } from '../services/api';
 
 const MAX_FILE_BYTES = 5 * 1024 * 1024; // 5 MB
+const HERO_PHRASES = ['a pothole?', 'garbage dumping?', 'a broken streetlight?', 'waterlogging?', 'illegal encroachment?'];
 
 function Icon({ name, className = '' }) {
     return <span className={`material-symbols-outlined ${className}`}>{name}</span>;
@@ -29,10 +30,41 @@ function CitizenReportPage() {
     const [coords, setCoords] = useState(null);
     const [locating, setLocating] = useState(false);
     const [submitting, setSubmitting] = useState(false);
+    const [listening, setListening] = useState(false);
+    const [heroIdx, setHeroIdx] = useState(0);
+    const recognitionRef = useRef(null);
+
+    const toggleVoice = () => {
+        const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+        if (!SR) { toast.error('Voice input not supported in this browser.'); return; }
+        if (listening) {
+            recognitionRef.current?.stop();
+            setListening(false);
+            return;
+        }
+        const rec = new SR();
+        rec.continuous = true;
+        rec.interimResults = false;
+        rec.lang = 'en-IN';
+        rec.onresult = (e) => {
+            const transcript = Array.from(e.results).map(r => r[0].transcript).join(' ');
+            setDescription(prev => (prev ? prev + ' ' : '') + transcript);
+        };
+        rec.onend = () => setListening(false);
+        rec.start();
+        recognitionRef.current = rec;
+        setListening(true);
+        toast('Listening… tap mic to stop', { icon: '🎙️' });
+    };
 
     useEffect(() => {
         return () => { if (preview) URL.revokeObjectURL(preview); };
     }, [preview]);
+
+    useEffect(() => {
+        const t = setInterval(() => setHeroIdx(i => (i + 1) % HERO_PHRASES.length), 2600);
+        return () => clearInterval(t);
+    }, []);
 
     // --- Handlers ---
     const handleFile = (e) => {
@@ -104,12 +136,24 @@ function CitizenReportPage() {
         : [];
 
     return (
-        <div className="min-h-screen bg-[#f6f6f8] font-display text-slate-900 pb-24">
+        <div className="min-h-screen bg-[#f6f6f8] font-display text-slate-900 overflow-x-hidden">
 
-            {/* ── Floating Glass Header ── */}
-            <header className="fixed top-4 left-4 right-4 z-40">
-                <div className="glass rounded-xl px-4 py-3 flex items-center justify-between">
-                    <h1 className="text-lg font-bold tracking-tight">Report a Civic Issue</h1>
+            {/* ── Animated Blob Background ── */}
+            <div className="blob blob-a" aria-hidden="true" />
+            <div className="blob blob-b" aria-hidden="true" />
+            <div className="blob blob-c" aria-hidden="true" />
+
+            {/* ── Header ── */}
+            <header className="relative z-40 w-full" style={{ background: 'rgba(255,255,255,0.25)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)', borderBottom: '1px solid rgba(255,255,255,0.35)' }}>
+                <div className="px-5 py-3.5 flex items-center justify-between">
+                    {/* Brand — top left */}
+                    <div className="flex items-center gap-2">
+                        <div className="bg-primary text-white rounded-lg w-7 h-7 flex items-center justify-center shadow-md shadow-primary/30">
+                            <span className="material-symbols-outlined text-[16px]">location_city</span>
+                        </div>
+                        <span className="text-base font-black tracking-tight text-slate-900">CivicLens</span>
+                    </div>
+                    {/* Admin — top right */}
                     <Link
                         to="/admin/login"
                         className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-primary hover:bg-primary/10 transition-colors"
@@ -121,11 +165,23 @@ function CitizenReportPage() {
             </header>
 
             {/* ── Form ── */}
-            <main className="pt-24 px-4 space-y-6 max-w-md mx-auto">
+            <main className="relative z-10 px-4 pt-6 space-y-6 max-w-md mx-auto">
+
+                {/* Hero */}
+                <section className="pt-4 pb-1 text-center">
+                    <p className="text-[11px] font-black uppercase tracking-[0.2em] text-primary/60 mb-3">CivicLens · Smart Civic Reporting</p>
+                    <h2 className="text-[28px] font-extrabold tracking-tight leading-tight text-slate-900">
+                        Spotted<br />
+                        <span key={heroIdx} className="text-primary animate-hero-fade">
+                            {HERO_PHRASES[heroIdx]}
+                        </span>
+                    </h2>
+                    <p className="text-sm text-slate-500 mt-2">Report it in 30 seconds. Make your city better.</p>
+                </section>
 
                 {/* Photo Upload */}
-                <section className="space-y-3">
-                    <label className="block text-sm font-semibold text-slate-600 px-1">
+                <section className="bg-white/60 backdrop-blur-sm border border-white/80 shadow-sm rounded-2xl p-4 space-y-3">
+                    <label className="block text-sm font-semibold text-slate-600">
                         Visual Evidence
                     </label>
 
@@ -146,7 +202,7 @@ function CitizenReportPage() {
                             </button>
                         </div>
                     ) : (
-                        <label className="refractive-glass rounded-xl h-64 flex flex-col items-center justify-center border-dashed border-2 border-primary/20 group cursor-pointer transition-all active:scale-[0.98]">
+                        <label className="refractive-glass rounded-2xl h-64 flex flex-col items-center justify-center border-dashed border-2 border-primary/20 group cursor-pointer transition-all active:scale-[0.98]">
                             <div className="bg-primary text-white rounded-full p-4 shadow-lg shadow-primary/30 mb-4 group-hover:scale-110 transition-transform relative z-10">
                                 <Icon name="photo_camera" className="text-4xl" />
                             </div>
@@ -164,19 +220,32 @@ function CitizenReportPage() {
                 </section>
 
                 {/* Description */}
-                <section className="space-y-3">
-                    <label className="block text-sm font-semibold text-slate-600 px-1">
+                <section className="bg-white/60 backdrop-blur-sm border border-white/80 shadow-sm rounded-2xl p-4 space-y-3">
+                    <label className="block text-sm font-semibold text-slate-600">
                         Issue Description
                     </label>
-                    <div className="glass rounded-xl p-1 focus-within:ring-2 focus-within:ring-primary/50 transition-all">
+                    <div className="glass rounded-2xl p-1 focus-within:ring-2 focus-within:ring-primary/50 transition-all">
                         <textarea
                             value={description}
                             onChange={(e) => setDescription(e.target.value)}
                             placeholder="Provide details about the issue (e.g., broken streetlight, pothole, illegal dumping)..."
                             maxLength={500}
-                            className="w-full bg-transparent border-none focus:ring-0 text-slate-900 p-3 min-h-[140px] placeholder:text-slate-400 text-base resize-none"
+                            className="w-full bg-transparent border-none outline-none focus:ring-0 text-slate-900 p-3 min-h-[140px] placeholder:text-slate-400 text-base resize-none"
                         />
-                        <div className="flex justify-end p-2">
+                        <div className="flex items-center justify-between p-2">
+                            <button
+                                type="button"
+                                onClick={toggleVoice}
+                                className={`flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-full transition-all ${
+                                    listening
+                                        ? 'bg-red-500 text-white animate-pulse'
+                                        : 'text-slate-500 hover:text-primary'
+                                }`}
+                                title={listening ? 'Stop listening' : 'Speak your description'}
+                            >
+                                <Icon name={listening ? 'mic_off' : 'mic'} className="text-[16px]" />
+                                {listening ? 'Stop' : 'Voice Input'}
+                            </button>
                             <span className="text-[10px] font-bold tracking-wider text-slate-400 bg-slate-100 px-2 py-1 rounded-full">
                                 {description.length} / 500
                             </span>
@@ -185,8 +254,8 @@ function CitizenReportPage() {
                 </section>
 
                 {/* Location */}
-                <section className="space-y-3">
-                    <div className="flex items-center justify-between px-1">
+                <section className="bg-white/60 backdrop-blur-sm border border-white/80 shadow-sm rounded-2xl p-4 space-y-3">
+                    <div className="flex items-center justify-between">
                         <label className="text-sm font-semibold text-slate-600">
                             Incident Location
                         </label>
@@ -201,7 +270,7 @@ function CitizenReportPage() {
                         </button>
                     </div>
 
-                    <div className="relative rounded-xl overflow-hidden glass h-48 border border-slate-200">
+                    <div className="relative rounded-2xl overflow-hidden glass h-48 border border-slate-200">
                         <MapView
                             center={coords ? [coords.lng, coords.lat] : [78.9629, 20.5937]}
                             zoom={coords ? 14 : 4}
@@ -233,8 +302,8 @@ function CitizenReportPage() {
                 </section>
 
                 {/* Category Shortcuts */}
-                <section className="space-y-3">
-                    <label className="block text-sm font-semibold text-slate-600 px-1">
+                <section className="bg-white/60 backdrop-blur-sm border border-white/80 shadow-sm rounded-2xl p-4 space-y-3">
+                    <label className="block text-sm font-semibold text-slate-600">
                         Common Categories
                     </label>
                     <div className="flex gap-2 overflow-x-auto pb-2">
@@ -255,22 +324,25 @@ function CitizenReportPage() {
                         ))}
                     </div>
                 </section>
-            </main>
 
-            {/* ── Sticky Footer Button ── */}
-            <footer className="fixed bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-[#f6f6f8] via-[#f6f6f8]/90 to-transparent z-40">
-                <div className="max-w-md mx-auto">
+                {/* Submit Button */}
+                <section className="pt-4 pb-16">
                     <button
                         type="button"
                         onClick={handleSubmit}
                         disabled={submitting || !photo || !coords}
-                        className="w-full bg-primary text-white font-bold py-4 rounded-xl shadow-xl shadow-primary/30 flex items-center justify-center gap-2 hover:brightness-110 active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                        className="w-full bg-primary text-white font-bold py-5 rounded-2xl shadow-xl shadow-primary/30 flex items-center justify-center gap-2 text-base hover:brightness-110 active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed transition-all"
                     >
                         <span>{submitting ? 'Submitting…' : 'Submit Report'}</span>
                         <Icon name={submitting ? 'hourglass_empty' : 'send'} />
                     </button>
-                </div>
-            </footer>
+                    {(!photo || !coords) && (
+                        <p className="text-center text-xs text-slate-400 mt-3">
+                            {!photo && !coords ? 'Add a photo and pin your location to continue' : !photo ? 'Add a photo to continue' : 'Pin your location to continue'}
+                        </p>
+                    )}
+                </section>
+            </main>
         </div>
     );
 }

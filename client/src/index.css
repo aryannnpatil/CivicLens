@@ -66,3 +66,57 @@ body {
 .mapboxgl-interactive:active {
   cursor: grabbing;
 }
+
+/* ── Animated Blob Background ── */
+@keyframes blob-drift-a {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  33%       { transform: translate(44px, -64px) scale(1.12); }
+  66%       { transform: translate(-32px, 42px) scale(0.94); }
+}
+@keyframes blob-drift-b {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  33%       { transform: translate(-52px, 28px) scale(1.06); }
+  66%       { transform: translate(34px, -52px) scale(1.1); }
+}
+@keyframes blob-drift-c {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  33%       { transform: translate(22px, 54px) scale(0.9); }
+  66%       { transform: translate(-44px, -22px) scale(1.05); }
+}
+
+.blob {
+  position: fixed;
+  border-radius: 9999px;
+  filter: blur(96px);
+  opacity: 0.28;
+  pointer-events: none;
+  z-index: 0;
+}
+.blob-a {
+  width: 420px; height: 420px;
+  background: radial-gradient(circle, #818cf8, #6366f1);
+  top: -130px; left: -110px;
+  animation: blob-drift-a 14s ease-in-out infinite;
+}
+.blob-b {
+  width: 360px; height: 360px;
+  background: radial-gradient(circle, #60a5fa, #3b82f6);
+  top: 38%; right: -110px;
+  animation: blob-drift-b 19s ease-in-out infinite;
+}
+.blob-c {
+  width: 310px; height: 310px;
+  background: radial-gradient(circle, #a78bfa, #8b5cf6);
+  bottom: 130px; left: 8%;
+  animation: blob-drift-c 12s ease-in-out infinite;
+}
+
+/* ── Hero text fade-up ── */
+@keyframes hero-fade {
+  from { opacity: 0; transform: translateY(10px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.animate-hero-fade {
+  animation: hero-fade 0.45s ease-out forwards;
+  display: inline-block;
+}
