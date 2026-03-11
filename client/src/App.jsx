@@ -11,21 +11,21 @@ function App() {
         <BrowserRouter>
             <Toaster position="top-center" toastOptions={{ duration: 3500 }} />
             {/* Hardcoded View Toggle — No Auth */}
-            <div className="fixed top-4 right-4 z-50 flex bg-white rounded-lg shadow-lg overflow-hidden border border-gray-200">
+            <div className="fixed top-5 right-6 z-50 flex liquid-glass rounded-xl overflow-hidden">
                 <button
                     onClick={() => setView('citizen')}
-                    className={`px-4 py-2 text-sm font-medium transition-colors ${view === 'citizen'
-                            ? 'bg-primary-600 text-white'
-                            : 'bg-white text-gray-600 hover:bg-gray-50'
+                    className={`px-5 py-2.5 text-sm font-medium transition-colors ${view === 'citizen'
+                            ? 'bg-primary text-white shadow-lg shadow-primary/20'
+                            : 'text-slate-600 hover:bg-white/60'
                         }`}
                 >
                     🏠 Citizen
                 </button>
                 <button
                     onClick={() => setView('admin')}
-                    className={`px-4 py-2 text-sm font-medium transition-colors ${view === 'admin'
-                            ? 'bg-primary-600 text-white'
-                            : 'bg-white text-gray-600 hover:bg-gray-50'
+                    className={`px-5 py-2.5 text-sm font-medium transition-colors ${view === 'admin'
+                            ? 'bg-primary text-white shadow-lg shadow-primary/20'
+                            : 'text-slate-600 hover:bg-white/60'
                         }`}
                 >
                     🛡️ Admin
