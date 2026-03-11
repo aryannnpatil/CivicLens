@@ -13,3 +13,17 @@ body {
   font-family: 'Inter', system-ui, -apple-system, sans-serif;
   -webkit-font-smoothing: antialiased;
 }
+
+/* Mapbox GL — fix cursor on interactive maps */
+.mapboxgl-canvas {
+  outline: none;
+}
+.mapboxgl-map {
+  cursor: default;
+}
+.mapboxgl-interactive {
+  cursor: grab;
+}
+.mapboxgl-interactive:active {
+  cursor: grabbing;
+}

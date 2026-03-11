@@ -1,5 +1,6 @@
-import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import { BrowserRouter } from 'react-router-dom';
 import { useState } from 'react';
+import { Toaster } from 'react-hot-toast';
 import CitizenReportPage from './pages/CitizenReportPage';
 import AdminDashboard from './pages/AdminDashboard';
 
@@ -8,6 +9,7 @@ function App() {
 
     return (
         <BrowserRouter>
+            <Toaster position="top-center" toastOptions={{ duration: 3500 }} />
             {/* Hardcoded View Toggle — No Auth */}
             <div className="fixed top-4 right-4 z-50 flex bg-white rounded-lg shadow-lg overflow-hidden border border-gray-200">
                 <button
