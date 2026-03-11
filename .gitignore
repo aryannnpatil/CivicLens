@@ -1,20 +1,38 @@
+# IDE / tooling
 .codersinflow
 .vscode
-node_modules
-.env
-.venv
 .codex
-out
-dist
-*.vsix
 .claude
 CLAUDE.md
 .DS_Store
 .git
+.github
+
+# Secrets
+.env
+.env.local
+
+# Node
+node_modules/
+dist/
+out/
+.next/
+*.vsix
+
+# Logs & temps
 *.log
 *.tmp
-__pycache__
+uploads/           # local Multer temp uploads
+
+# Python
+__pycache__/
 *.pyc
-.env.local
-.next
-.github
+*.pyo
+.venv/
+venv/
+*.egg-info/
+.pytest_cache/
+
+# Build artifacts
+build/
+*.tgz
