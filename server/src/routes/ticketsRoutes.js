@@ -1,12 +1,14 @@
 const express = require('express');
-const { getTickets, postTicket, patchTicketStatus, getDashboardStats } = require('../controllers/ticketsController');
+const { getTickets, postTicket, patchTicketStatus, getTicketById, getDashboardStats } = require('../controllers/ticketsController');
 const { upload } = require('../config/multer');
+const { validatePostTicket, validatePatchTicket } = require('../middleware/validate');
 
 const router = express.Router();
 
 router.get('/stats', getDashboardStats);
 router.get('/tickets', getTickets);
-router.post('/tickets', upload.single('photo'), postTicket);
-router.patch('/tickets/:id', patchTicketStatus);
+router.get('/tickets/:id', getTicketById);
+router.post('/tickets', upload.single('photo'), validatePostTicket, postTicket);
+router.patch('/tickets/:id', validatePatchTicket, patchTicketStatus);
 
 module.exports = router;

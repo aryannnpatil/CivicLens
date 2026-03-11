@@ -1,6 +1,7 @@
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
+const mongoose = require('mongoose');
 
 const ticketRoutes = require('./src/routes/ticketsRoutes');
 const authRoutes = require('./src/routes/authRoutes');
@@ -35,22 +36,40 @@ app.get('/health', (req, res) => {
 });
 
 // ========================
-// Start Server (Phase 1: In-memory data only)
+// Start Server — connect MongoDB then listen
 // ========================
 seedTickets();
 seedAdmin();
 
-const server = app.listen(PORT, () => {
-    console.log('Server running with in-memory ticket data');
-    console.log(`Listening on http://localhost:${PORT}`);
-});
+const MONGO_URI = process.env.MONGO_URI;
 
-server.on('error', (error) => {
-    if (error.code === 'EADDRINUSE') {
-        console.error(`Port ${PORT} is already in use.`);
-        console.error('Stop the existing process on that port or set a different PORT in .env.');
-        process.exit(1);
+async function startServer() {
+    if (MONGO_URI) {
+        try {
+            await mongoose.connect(MONGO_URI);
+            console.log('MongoDB connected');
+        } catch (err) {
+            console.error('MongoDB connection failed — running without persistence:', err.message);
+        }
+    } else {
+        console.warn('MONGO_URI not set — MongoDB persistence disabled');
     }
 
-    throw error;
-});
+    const server = app.listen(PORT, () => {
+        console.log('Server running');
+        console.log(`Listening on http://localhost:${PORT}`);
+    });
+
+    server.on('error', (error) => {
+        if (error.code === 'EADDRINUSE') {
+            console.error(`Port ${PORT} is already in use.`);
+            console.error('Stop the existing process on that port or set a different PORT in .env.');
+            process.exit(1);
+        }
+        throw error;
+    });
+}
+
+startServer();
+
+

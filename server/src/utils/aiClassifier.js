@@ -8,7 +8,7 @@ async function classifyImageFromUrl(photoUrl) {
         endpoint,
         { photoUrl },
         {
-            timeout: 30000,
+            timeout: 6000,
         }
     );
 

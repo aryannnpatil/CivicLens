@@ -34,7 +34,7 @@ async function uploadBufferToBlob({ buffer, originalName, mimeType }) {
     const blobServiceClient = BlobServiceClient.fromConnectionString(connectionString);
     const containerClient = blobServiceClient.getContainerClient(containerName);
 
-    await containerClient.createIfNotExists({ access: 'blob' });
+    await containerClient.createIfNotExists();
 
     const blobName = buildBlobName(originalName, mimeType);
     const blockBlobClient = containerClient.getBlockBlobClient(blobName);
