@@ -20,13 +20,22 @@ router.post('/tickets', async (req, res) => {
     res.status(501).json({ success: false, error: 'Not implemented yet' });
 });
 
+const Ticket = require('../models/Ticket');
+
 // ============================================
-// GET /api/tickets — List tickets with filters
+// GET /api/tickets — List tickets
 // ============================================
 router.get('/tickets', async (req, res) => {
-    // TODO: Member 2
-    // Query params: status, category, sort, page, limit
-    res.status(501).json({ success: false, error: 'Not implemented yet' });
+    try {
+        const tickets = await Ticket.find().sort({ createdAt: -1 });
+        res.status(200).json({
+            success: true,
+            count: tickets.length,
+            data: tickets
+        });
+    } catch (err) {
+        res.status(500).json({ success: false, error: err.message });
+    }
 });
 
 // ============================================

@@ -7,7 +7,6 @@ const ticketSchema = new mongoose.Schema(
             type: String,
             trim: true,
             maxlength: 500,
-            default: '',
         },
         photoUrl: {
             type: String,
@@ -18,6 +17,7 @@ const ticketSchema = new mongoose.Schema(
                 type: String,
                 enum: ['Point'],
                 default: 'Point',
+                required: true,
             },
             coordinates: {
                 type: [Number], // [longitude, latitude]

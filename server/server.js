@@ -1,17 +1,22 @@
 require('dotenv').config();
 const express = require('express');
-const mongoose = require('mongoose');
 const cors = require('cors');
 
-const ticketRoutes = require('./routes/tickets');
+const ticketRoutes = require('./src/routes/ticketsRoutes');
+const { seedTickets } = require('./src/models/ticketStore');
 
 const app = express();
 const PORT = process.env.PORT || 3001;
+const CLIENT_ORIGIN = process.env.CLIENT_ORIGIN || 'http://localhost:5173';
 
 // ========================
 // Middleware
 // ========================
-app.use(cors());
+app.use(
+    cors({
+        origin: [CLIENT_ORIGIN, 'http://localhost:3000'],
+    })
+);
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
@@ -25,17 +30,11 @@ app.get('/health', (req, res) => {
 });
 
 // ========================
-// MongoDB Connection & Start
+// Start Server (Phase 1: In-memory data only)
 // ========================
-mongoose
-    .connect(process.env.MONGO_URI)
-    .then(() => {
-        console.log('✅ Connected to MongoDB Atlas');
-        app.listen(PORT, () => {
-            console.log(`🚀 Server running on http://localhost:${PORT}`);
-        });
-    })
-    .catch((err) => {
-        console.error('❌ MongoDB connection failed:', err.message);
-        process.exit(1);
-    });
+seedTickets();
+
+app.listen(PORT, () => {
+    console.log('🚀 Server running with in-memory ticket data');
+    console.log(`🌐 Listening on http://localhost:${PORT}`);
+});
