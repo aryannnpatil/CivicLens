@@ -1,159 +1,67 @@
-"""
-CivicLens AI Classification Microservice
-Flask server that classifies civic issue images using a pre-trained model.
-
-Endpoints:
-  POST /classify  — Accepts an image, returns {category, confidence, severity}
-  GET  /health    — Health check
-"""
-
-import os
-import math
 from flask import Flask, request, jsonify
-from flask_cors import CORS
+from transformers import pipeline
 from PIL import Image
 import io
 
 app = Flask(__name__)
-CORS(app)
 
-# ============================================
-# Configuration
-# ============================================
-CATEGORIES = ['pothole', 'garbage', 'broken_streetlight', 'waterlogging', 'other']
+# Load the model once when the server starts
+print("Loading AI Model...")
+classifier = pipeline("zero-shot-image-classification", model="openai/clip-vit-base-patch32")
 
-CATEGORY_WEIGHTS = {
-    'pothole': 1.0,
-    'waterlogging': 0.9,
-    'broken_streetlight': 0.7,
-    'garbage': 0.6,
-    'other': 0.5,
+LABEL_MAPPING = {
+    "a severe pothole, broken tarmac, or heavily damaged road surface": "Pothole",
+    "an overflowing garbage bin, litter, or pile of trash dumped on the street": "Garbage Dump",
+    "a flooded street, stagnant water, or severe road waterlogging": "Waterlogging",
+    "dangerous hanging electrical wires, tangled cables, or fallen poles": "Electrical Hazard",
+    "overflowing sewage, dirty water, or an open, blocked drainage system": "Open/Blocked Drain",
+    "a clean, normal, and well-maintained street with no visible issues": "Clean Street"
 }
+ai_descriptions = list(LABEL_MAPPING.keys())
 
-MODEL_NAME = 'MobileNetV2'  # Change to 'YOLOv8' if using ultralytics
-model = None  # Will be loaded on startup
+# Define severity levels for the AI to choose from
+SEVERITY_PROMPTS = [
+    "minor or small issue, low impact",        # Score: 1-3
+    "moderate damage or noticeable issue",    # Score: 4-6
+    "severe, dangerous, or high-risk issue",  # Score: 7-9
+    "extreme emergency or life-threatening"    # Score: 10
+]
 
-
-def load_model():
-    """
-    Load the pre-trained classification model.
-    TODO: Member 3 — Replace with actual model loading.
-    
-    Options:
-    1. MobileNetV2 (TensorFlow/Keras):
-       from tensorflow.keras.applications import MobileNetV2
-       model = MobileNetV2(weights='imagenet')
-    
-    2. YOLOv8-cls (Ultralytics):
-       from ultralytics import YOLO
-       model = YOLO('yolov8n-cls.pt')
-    
-    3. Custom fine-tuned model:
-       model = torch.load('models/weights/civic_classifier.pt')
-    """
-    global model, MODEL_NAME
-    print(f"🔄 Loading {MODEL_NAME} model...")
-    
-    # PLACEHOLDER: Simulates model loading
-    # Replace this block with real model initialization
-    model = "placeholder"
-    
-    print(f"✅ {MODEL_NAME} model loaded successfully")
-
-
-def classify_image(image_bytes):
-    """
-    Run inference on the image and return civic category + confidence.
-    TODO: Member 3 — Replace with actual inference logic.
-    
-    Expected return: (category: str, confidence: float)
-    """
-    # PLACEHOLDER: Returns mock classification
-    # Replace with real model inference:
-    #
-    # image = Image.open(io.BytesIO(image_bytes)).resize((224, 224))
-    # prediction = model.predict(preprocess(image))
-    # category = CATEGORIES[prediction.argmax()]
-    # confidence = float(prediction.max())
-    
-    import random
-    category = random.choice(CATEGORIES)
-    confidence = round(random.uniform(0.6, 0.98), 2)
-    
-    return category, confidence
-
-
-def calculate_severity(category, confidence):
-    """
-    Severity = ceil(confidence × category_weight × 10)
-    Range: 1–10
-    """
-    weight = CATEGORY_WEIGHTS.get(category, 0.5)
-    severity = math.ceil(confidence * weight * 10)
-    return max(1, min(10, severity))  # Clamp between 1 and 10
-
-
-# ============================================
-# Routes
-# ============================================
 @app.route('/classify', methods=['POST'])
-def classify():
-    """Accept an image file and return AI classification results."""
+def classify_image():
     if 'image' not in request.files:
-        return jsonify({
-            'success': False,
-            'error': 'No image file provided. Send as multipart/form-data with key "image".'
-        }), 400
+        return jsonify({"success": False, "error": "No image uploaded"}), 400
     
     file = request.files['image']
-    
-    if file.filename == '':
-        return jsonify({
-            'success': False,
-            'error': 'Empty filename.'
-        }), 400
-    
-    try:
-        image_bytes = file.read()
-        
-        # Validate it's actually an image
-        Image.open(io.BytesIO(image_bytes)).verify()
-        
-        category, confidence = classify_image(image_bytes)
-        severity = calculate_severity(category, confidence)
-        
-        return jsonify({
-            'success': True,
-            'category': category,
-            'confidence': confidence,
-            'severity': severity,
-        }), 200
-    
-    except Exception as e:
-        print(f"❌ Classification error: {e}")
-        return jsonify({
-            'success': False,
-            'error': 'Classification failed.',
-            'category': 'unclassified',
-            'confidence': 0.0,
-            'severity': 5,
-        }), 500
+    img = Image.open(io.BytesIO(file.read()))
 
+    # 1. Identify Category
+    cat_preds = classifier(img, candidate_labels=ai_descriptions)
+    top_cat = cat_preds[0]
+    final_category = LABEL_MAPPING[top_cat['label']]
+    confidence = top_cat['score']
 
-@app.route('/health', methods=['GET'])
-def health():
-    """Health check endpoint."""
+    # 2. Identify Severity (Zero-shot against severity prompts)
+    sev_preds = classifier(img, candidate_labels=SEVERITY_PROMPTS)
+    top_sev_label = sev_preds[0]['label']
+    
+    # Map the text label to a numeric score out of 10
+    severity_map = {
+        SEVERITY_PROMPTS[0]: 3,  # Minor
+        SEVERITY_PROMPTS[1]: 6,  # Moderate
+        SEVERITY_PROMPTS[2]: 8,  # Severe
+        SEVERITY_PROMPTS[3]: 10  # Extreme
+    }
+    severity_score = severity_map[top_sev_label]
+
     return jsonify({
-        'status': 'ok',
-        'model': MODEL_NAME,
-        'version': '1.0.0',
-    }), 200
+        "success": True,
+        "category": final_category,
+        "confidence": round(float(confidence), 2),
+        "severity": severity_score
+    })
 
-
-# ============================================
-# Startup
-# ============================================
 if __name__ == '__main__':
-    load_model()
-    port = int(os.environ.get('PORT', 5000))
-    app.run(host='0.0.0.0', port=port, debug=True)
+    # Using 0.0.0.0 makes the server accessible on your local network
+    # Change port to 5005 to avoid common conflicts with Windows AirPlay/Services
+    app.run(host='0.0.0.0', port=5000, debug=False)

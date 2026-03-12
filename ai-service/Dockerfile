@@ -4,7 +4,7 @@ WORKDIR /app
 
 # Install system dependencies for image processing
 RUN apt-get update && apt-get install -y \
-    libgl1-mesa-glx \
+    libgl1 \
     libglib2.0-0 \
     && rm -rf /var/lib/apt/lists/*
 
@@ -19,4 +19,4 @@ COPY . .
 EXPOSE 5000
 
 # Run with gunicorn for production
-CMD ["gunicorn", "--bind", "0.0.0.0:5000", "--timeout", "120", "--workers", "2", "app:app"]
+CMD ["gunicorn", "--workers", "1", "--timeout", "300", "--bind", "0.0.0.0:5000", "app:app"]

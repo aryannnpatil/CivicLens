@@ -1,17 +1,6 @@
-# Core
-flask==3.0.3
-flask-cors==5.0.0
-gunicorn==22.0.0
-
-# Image processing
-Pillow==10.4.0
-
-# ML — Uncomment ONE of the options below:
-
-# Option A: TensorFlow + MobileNetV2 (lighter, easier)
-# tensorflow==2.16.2
-
-# Option B: PyTorch + Ultralytics YOLOv8 (more powerful)
-# ultralytics==8.2.0
-# torch==2.3.0
-# torchvision==0.18.0
+Flask==3.0.0
+Pillow==10.0.1
+transformers==4.35.0
+torch==2.1.0
+gunicorn==21.2.0
+numpy<2.0.0
