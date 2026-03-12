@@ -232,18 +232,7 @@ function AdminDashboard() {
                 )}
               </h1>
             </div>
-            <div className="h-8 w-[1px] bg-slate-200 mx-2 hidden md:block" />
-            <div className="relative hidden md:block">
-              <Icon
-                name="search"
-                className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-[20px]"
-              />
-              <input
-                className="bg-slate-100/50 border-none rounded-lg pl-10 pr-4 py-2 text-sm focus:ring-2 focus:ring-primary w-64 transition-all placeholder-slate-400"
-                placeholder="Search reports, assets..."
-                type="text"
-              />
-            </div>
+                
           </div>
           <div className="flex items-center gap-4">
             <button
