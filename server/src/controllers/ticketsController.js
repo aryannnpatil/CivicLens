@@ -6,9 +6,57 @@ const mongoose = require('mongoose');
 
 const ALLOWED_STATUS = ['open', 'in_progress', 'resolved'];
 
+/** Haversine distance in km between two [lng, lat] points */
+function haversineKm(lng1, lat1, lng2, lat2) {
+    const R = 6371;
+    const toRad = (d) => (d * Math.PI) / 180;
+    const dLat = toRad(lat2 - lat1);
+    const dLng = toRad(lng2 - lng1);
+    const a =
+        Math.sin(dLat / 2) ** 2 +
+        Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLng / 2) ** 2;
+    return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
+/** Apply bounding-box and/or radius geo-filter to a ticket array (mutates nothing). */
+function applyGeoFilter(tickets, query) {
+    let result = tickets;
+
+    // Bounding box: minLng, maxLng, minLat, maxLat
+    const minLng = parseFloat(query.minLng);
+    const maxLng = parseFloat(query.maxLng);
+    const minLat = parseFloat(query.minLat);
+    const maxLat = parseFloat(query.maxLat);
+    if ([minLng, maxLng, minLat, maxLat].every((v) => !Number.isNaN(v))) {
+        result = result.filter((t) => {
+            const [lng, lat] = t.location?.coordinates ?? [];
+            return lng >= minLng && lng <= maxLng && lat >= minLat && lat <= maxLat;
+        });
+    }
+
+    // Radius: lng, lat, radiusKm
+    const cLng = parseFloat(query.lng);
+    const cLat = parseFloat(query.lat);
+    const radiusKm = parseFloat(query.radiusKm);
+    if (!Number.isNaN(cLng) && !Number.isNaN(cLat) && !Number.isNaN(radiusKm) && radiusKm > 0) {
+        result = result.filter((t) => {
+            const [tLng, tLat] = t.location?.coordinates ?? [];
+            return haversineKm(cLng, cLat, tLng, tLat) <= radiusKm;
+        });
+    }
+
+    return result;
+}
+
 function getTickets(req, res) {
     const { status, category, sort } = req.query;
+    const page = Math.max(1, parseInt(req.query.page, 10) || 1);
+    const limit = Math.min(100, Math.max(1, parseInt(req.query.limit, 10) || 50));
+
     let tickets = [...getAllTickets()];
+
+    // Geo filter (bounding box and/or radius)
+    tickets = applyGeoFilter(tickets, req.query);
 
     if (status) {
         tickets = tickets.filter((ticket) => ticket.status === status);
@@ -21,7 +69,6 @@ function getTickets(req, res) {
     // sort=severity → severityScore desc; no sort → createdAt desc
     const sortMap = { severity: 'severityScore' };
     const resolvedField = sort ? (sortMap[sort] || sort) : 'createdAt';
-    const sortDirection = sort ? -1 : -1; // both cases descending
 
     const sortableFields = new Set(['severityScore', 'createdAt']);
     if (sortableFields.has(resolvedField)) {
@@ -33,10 +80,17 @@ function getTickets(req, res) {
         });
     }
 
+    // Pagination
+    const total = tickets.length;
+    const start = (page - 1) * limit;
+    const paginated = tickets.slice(start, start + limit);
+
     return res.status(200).json({
         success: true,
-        count: tickets.length,
-        data: tickets,
+        count: paginated.length,
+        total,
+        page,
+        data: paginated,
     });
 }
 
@@ -77,11 +131,9 @@ async function postTicket(req, res) {
             });
             photoUrl = blobUrl;
         } catch (azureErr) {
-            console.error('Azure upload failed:', azureErr.message);
-            return res.status(500).json({
-                success: false,
-                error: 'Image upload to Azure failed.',
-            });
+            console.warn('⚠️  Azure unavailable, using demo mode:', azureErr.message);
+            // Demo fallback: generate placeholder URL
+            photoUrl = `https://via.placeholder.com/600x400/4F46E5/FFFFFF?text=Issue+Photo+${Date.now()}`;
         }
     }
 
@@ -200,19 +252,60 @@ async function getTicketById(req, res) {
 async function getDashboardStats(req, res) {
     if (mongoose.connection.readyState === 1) {
         try {
-            const [total, open, in_progress, resolved] = await Promise.all([
-                TicketModel.countDocuments(),
-                TicketModel.countDocuments({ status: 'open' }),
-                TicketModel.countDocuments({ status: 'in_progress' }),
-                TicketModel.countDocuments({ status: 'resolved' }),
+            const [statusAgg, categoryAgg, severityAgg] = await Promise.all([
+                TicketModel.aggregate([
+                    { $group: { _id: '$status', count: { $sum: 1 } } },
+                ]),
+                TicketModel.aggregate([
+                    { $group: { _id: '$aiCategory', count: { $sum: 1 } } },
+                ]),
+                TicketModel.aggregate([
+                    { $group: { _id: null, avg: { $avg: '$severityScore' }, total: { $sum: 1 } } },
+                ]),
             ]);
-            return res.status(200).json({ total, open, in_progress, resolved });
+
+            const byStatus = { open: 0, in_progress: 0, resolved: 0 };
+            for (const s of statusAgg) {
+                if (s._id in byStatus) byStatus[s._id] = s.count;
+            }
+
+            const byCategory = {};
+            for (const c of categoryAgg) {
+                byCategory[c._id || 'other'] = c.count;
+            }
+
+            const total = severityAgg[0]?.total ?? 0;
+            const avgSeverity = total ? Math.round((severityAgg[0].avg ?? 0) * 10) / 10 : 0;
+
+            return res.status(200).json({
+                success: true,
+                data: { total, byStatus, byCategory, avgSeverity },
+            });
         } catch (err) {
             console.error('Stats MongoDB query failed:', err.message);
         }
     }
-    // Fallback to in-memory counts
-    return res.status(200).json(getStats());
+
+    // Fallback to in-memory counts (with geo-filter support)
+    let filtered = [...getAllTickets()];
+    filtered = applyGeoFilter(filtered, req.query);
+
+    const byStatus = { open: 0, in_progress: 0, resolved: 0 };
+    const byCategory = {};
+    let severitySum = 0;
+    for (const t of filtered) {
+        if (t.status in byStatus) byStatus[t.status]++;
+        const cat = t.aiCategory || 'other';
+        byCategory[cat] = (byCategory[cat] || 0) + 1;
+        severitySum += t.severityScore || 0;
+    }
+    const total = filtered.length;
+    const avgSeverity = total ? Math.round((severitySum / total) * 10) / 10 : 0;
+
+    return res.status(200).json({
+        success: true,
+        data: { total, byStatus, byCategory, avgSeverity },
+    });
 }
 
 module.exports = {

@@ -9,7 +9,7 @@
  * ✅ Auto-refresh every 15 seconds
  * ✅ Liquid glass UI design
  */
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import toast from "react-hot-toast";
 import MapView, { severityColor } from "../components/MapView";
@@ -85,7 +85,7 @@ function Icon({ name, className = "" }) {
 // ─── AdminDashboard ───────────────────────────────────────────────────────────
 
 function AdminDashboard() {
-  const { logout } = useAuth();
+  const { logout, admin } = useAuth();
   const navigate = useNavigate();
   const [tickets, setTickets] = useState([]);
   const [stats, setStats] = useState(null);
@@ -97,6 +97,19 @@ function AdminDashboard() {
     category: "",
     sort: "-severityScore",
   });
+  const [bounds, setBounds] = useState(null);
+  const debounceRef = useRef(null);
+
+  // Jurisdiction-derived map props
+  const jurisdiction = admin?.jurisdiction ?? null;
+  const mapCenter = jurisdiction ? jurisdiction.center : [78.9629, 20.5937];
+  const mapZoom = jurisdiction ? 11 : 4;
+
+  // Debounced bounds change handler
+  const handleBoundsChange = useCallback((newBounds) => {
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => setBounds(newBounds), 300);
+  }, []);
 
   // ── Data fetching ──
   const fetchAll = useCallback(async () => {
@@ -105,6 +118,21 @@ function AdminDashboard() {
       if (filters.status) params.status = filters.status;
       if (filters.category) params.category = filters.category;
       if (filters.sort) params.sort = filters.sort;
+
+      // Jurisdiction radius filter (server-side)
+      if (jurisdiction) {
+        params.lng = jurisdiction.center[0];
+        params.lat = jurisdiction.center[1];
+        params.radiusKm = jurisdiction.radiusKm;
+      }
+
+      // Viewport bounding box (refine within jurisdiction)
+      if (bounds) {
+        params.minLng = bounds.minLng;
+        params.maxLng = bounds.maxLng;
+        params.minLat = bounds.minLat;
+        params.maxLat = bounds.maxLat;
+      }
 
       const ticketsRes = await getTickets(params);
       const data = ticketsRes.data?.data ?? [];
@@ -123,7 +151,7 @@ function AdminDashboard() {
     } finally {
       setLoading(false);
     }
-  }, [filters]);
+  }, [filters, jurisdiction, bounds]);
 
   useEffect(() => {
     setLoading(true);
@@ -197,6 +225,11 @@ function AdminDashboard() {
               </div>
               <h1 className="text-xl font-bold tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-slate-900 to-slate-600">
                 Civic Admin Portal
+                {jurisdiction && (
+                  <span className="ml-2 text-sm font-medium text-primary">
+                    — {jurisdiction.city}
+                  </span>
+                )}
               </h1>
             </div>
             <div className="h-8 w-[1px] bg-slate-200 mx-2 hidden md:block" />
@@ -462,9 +495,10 @@ function AdminDashboard() {
               </div>
               <div className="flex-1 relative min-h-[400px]">
                 <MapView
-                  center={[78.9629, 20.5937]}
-                  zoom={4}
+                  center={mapCenter}
+                  zoom={mapZoom}
                   markers={mapMarkers}
+                  onBoundsChange={handleBoundsChange}
                   interactive
                 />
                 {/* Heatmap Legend Overlay */}

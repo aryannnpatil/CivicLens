@@ -27,14 +27,14 @@ router.post('/login', (req, res) => {
     }
 
     const token = jwt.sign(
-        { id: admin.id, username: admin.username, role: admin.role },
+        { id: admin.id, username: admin.username, role: admin.role, jurisdiction: admin.jurisdiction ?? null },
         JWT_SECRET,
         { expiresIn: TOKEN_EXPIRY }
     );
 
     res.json({
         token,
-        admin: { id: admin.id, username: admin.username, role: admin.role },
+        admin: { id: admin.id, username: admin.username, role: admin.role, jurisdiction: admin.jurisdiction ?? null },
     });
 });
 

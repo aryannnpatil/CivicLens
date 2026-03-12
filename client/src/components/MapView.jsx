@@ -19,17 +19,23 @@ function MapView({
     zoom = 13,
     markers = [],
     onMapClick,
+    onBoundsChange,
     interactive = true,
 }) {
     const containerRef = useRef(null);
     const mapRef = useRef(null);
     const markersRef = useRef([]);
     const onMapClickRef = useRef(onMapClick);
+    const onBoundsChangeRef = useRef(onBoundsChange);
 
     // Keep click callback ref fresh without re-initialising the map
     useEffect(() => {
         onMapClickRef.current = onMapClick;
     }, [onMapClick]);
+
+    useEffect(() => {
+        onBoundsChangeRef.current = onBoundsChange;
+    }, [onBoundsChange]);
 
     // --- Initialise map once ---
     useEffect(() => {
@@ -55,6 +61,18 @@ function MapView({
         map.on('click', (e) => {
             onMapClickRef.current?.({ lng: e.lngLat.lng, lat: e.lngLat.lat });
         });
+
+        const fireBounds = () => {
+            const b = map.getBounds();
+            onBoundsChangeRef.current?.({
+                minLng: b.getWest(),
+                maxLng: b.getEast(),
+                minLat: b.getSouth(),
+                maxLat: b.getNorth(),
+            });
+        };
+        map.on('moveend', fireBounds);
+        map.once('load', fireBounds);
 
         mapRef.current = map;
         return () => {

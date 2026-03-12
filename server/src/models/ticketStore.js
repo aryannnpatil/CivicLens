@@ -107,6 +107,57 @@ function seedTickets() {
             photoUrl: 'https://example.com/issues/waterlogging-market.jpg',
             longitude: 74.8723, latitude: 32.7266,
             aiCategory: 'waterlogging', aiConfidence: 0.92, severityScore: 9, status: 'in_progress',
+        }),
+        // ── Ranchi tickets ──
+        createSeedTicket({
+            description: 'Deep pothole on Main Road near Ranchi Railway Station.',
+            photoUrl: 'https://example.com/issues/ranchi-pothole-station.jpg',
+            longitude: 85.3350, latitude: 23.3432,
+            aiCategory: 'pothole', aiConfidence: 0.91, severityScore: 8, status: 'open',
+        }),
+        createSeedTicket({
+            description: 'Overflowing garbage near Firayalal Chowk, Ranchi.',
+            photoUrl: 'https://example.com/issues/ranchi-garbage-firayalal.jpg',
+            longitude: 85.3096, latitude: 23.3551,
+            aiCategory: 'garbage', aiConfidence: 0.86, severityScore: 7, status: 'open',
+        }),
+        createSeedTicket({
+            description: 'Streetlight out on Kanke Road for over a week.',
+            photoUrl: 'https://example.com/issues/ranchi-streetlight-kanke.jpg',
+            longitude: 85.3200, latitude: 23.3700,
+            aiCategory: 'broken_streetlight', aiConfidence: 0.89, severityScore: 6, status: 'in_progress',
+        }),
+        createSeedTicket({
+            description: 'Waterlogging at Lalpur Chowk after monsoon rain.',
+            photoUrl: 'https://example.com/issues/ranchi-waterlogging-lalpur.jpg',
+            longitude: 85.3150, latitude: 23.3600,
+            aiCategory: 'waterlogging', aiConfidence: 0.93, severityScore: 9, status: 'open',
+        }),
+        // ── Mumbai tickets ──
+        createSeedTicket({
+            description: 'Massive pothole on Western Express Highway, Andheri.',
+            photoUrl: 'https://example.com/issues/mumbai-pothole-andheri.jpg',
+            longitude: 72.8370, latitude: 19.1136,
+            aiCategory: 'pothole', aiConfidence: 0.90, severityScore: 8, status: 'open',
+        }),
+        createSeedTicket({
+            description: 'Garbage pileup outside Dadar station west entrance.',
+            photoUrl: 'https://example.com/issues/mumbai-garbage-dadar.jpg',
+            longitude: 72.8430, latitude: 19.0178,
+            aiCategory: 'garbage', aiConfidence: 0.84, severityScore: 7, status: 'in_progress',
+        }),
+        // ── Delhi tickets ──
+        createSeedTicket({
+            description: 'Broken streetlight near India Gate causing safety concern.',
+            photoUrl: 'https://example.com/issues/delhi-streetlight-indiagate.jpg',
+            longitude: 77.2295, latitude: 28.6129,
+            aiCategory: 'broken_streetlight', aiConfidence: 0.92, severityScore: 8, status: 'open',
+        }),
+        createSeedTicket({
+            description: 'Severe waterlogging at ITO intersection after rain.',
+            photoUrl: 'https://example.com/issues/delhi-waterlogging-ito.jpg',
+            longitude: 77.2407, latitude: 28.6280,
+            aiCategory: 'waterlogging', aiConfidence: 0.88, severityScore: 9, status: 'open',
         })
     );
 }
@@ -150,12 +201,21 @@ function updateTicketStatus(id, status) {
 }
 
 function getStats() {
-    return {
-        total: tickets.length,
-        open: tickets.filter((t) => t.status === 'open').length,
-        in_progress: tickets.filter((t) => t.status === 'in_progress').length,
-        resolved: tickets.filter((t) => t.status === 'resolved').length,
-    };
+    const byStatus = { open: 0, in_progress: 0, resolved: 0 };
+    const byCategory = {};
+    let severitySum = 0;
+
+    for (const t of tickets) {
+        if (t.status in byStatus) byStatus[t.status]++;
+        const cat = t.aiCategory || 'other';
+        byCategory[cat] = (byCategory[cat] || 0) + 1;
+        severitySum += t.severityScore || 0;
+    }
+
+    const total = tickets.length;
+    const avgSeverity = total ? Math.round((severitySum / total) * 10) / 10 : 0;
+
+    return { total, byStatus, byCategory, avgSeverity };
 }
 
 module.exports = {

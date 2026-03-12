@@ -70,6 +70,106 @@ python app.py               # → http://localhost:5000
 
 ---
 
+## API Reference
+
+Base URL: `http://localhost:3001`
+
+### Authentication
+
+| Method | Endpoint | Auth | Description |
+|--------|----------|------|-------------|
+| POST | `/api/auth/login` | No | Admin login → returns JWT |
+| GET | `/api/auth/verify` | Bearer | Verify existing token |
+
+**Login:**
+```
+POST /api/auth/login
+{ "username": "admin@gov", "password": "admin@gov" }
+→ 200 { "token": "...", "admin": { "id", "username", "role" } }
+```
+
+### Tickets
+
+| Method | Endpoint | Auth | Description |
+|--------|----------|------|-------------|
+| POST | `/api/tickets` | No | Submit a new civic issue (multipart or JSON) |
+| GET | `/api/tickets` | No | List tickets with filters, sort, pagination |
+| GET | `/api/tickets/:id` | No | Get a single ticket by ID |
+| PATCH | `/api/tickets/:id` | No | Update ticket status |
+| GET | `/api/stats` | No | Dashboard aggregate statistics |
+
+**Submit Ticket:**
+```
+POST /api/tickets  (multipart/form-data)
+Fields: photo (file), description (string), longitude (number), latitude (number)
+
+POST /api/tickets  (application/json)
+{ "photoUrl": "...", "description": "...", "longitude": 77.59, "latitude": 12.97 }
+
+→ 201 { "success": true, "data": { ticket object } }
+```
+
+**List Tickets:**
+```
+GET /api/tickets?status=open&category=pothole&sort=severity&page=1&limit=10
+
+→ 200 { "success": true, "count": 10, "total": 45, "page": 1, "data": [...] }
+```
+
+**Update Status:**
+```
+PATCH /api/tickets/:id
+{ "status": "in_progress" }   // open | in_progress | resolved
+
+→ 200 { "success": true, "data": { updated ticket } }
+```
+
+**Dashboard Stats:**
+```
+GET /api/stats
+
+→ 200 {
+    "success": true,
+    "data": {
+      "total": 128,
+      "byStatus": { "open": 74, "in_progress": 31, "resolved": 23 },
+      "byCategory": { "pothole": 42, "garbage": 35, ... },
+      "avgSeverity": 6.4
+    }
+  }
+```
+
+### Utility
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/health` | Server health check |
+| GET | `/api/test-azure` | Azure Blob Storage connectivity test |
+
+### Error Codes
+
+| Code | Meaning |
+|------|---------|
+| 400 | Validation error (missing/invalid fields) |
+| 401 | Unauthorized (invalid or missing JWT) |
+| 404 | Ticket not found |
+| 500 | Server error (DB or Azure failure) |
+
+### Environment Variables
+
+| Variable | Required | Description |
+|----------|----------|-------------|
+| `PORT` | No | Server port (default: 3001) |
+| `MONGO_URI` | Yes | MongoDB Atlas connection string |
+| `AZURE_STORAGE_CONNECTION_STRING` | Yes | Azure Blob Storage connection |
+| `AZURE_STORAGE_CONTAINER_NAME` | Yes | Blob container name (default: ticket-images) |
+| `FLASK_API_URL` | No | AI service URL (default: http://localhost:5000) |
+| `JWT_SECRET` | Yes | Secret key for JWT signing |
+| `CLIENT_ORIGIN` | No | Frontend origin for CORS (default: http://localhost:5173) |
+| `NODE_ENV` | No | Environment mode (development/production) |
+
+---
+
 ## Tech Stack
 
 | Layer | Tech |
