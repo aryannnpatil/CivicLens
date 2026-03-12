@@ -13,6 +13,32 @@
 import { useState, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import toast from 'react-hot-toast';
+import { debugLog } from '../utils/debug';
+
+/** Compress a camera image to max 1280px and ~80% quality before upload.
+ *  Reduces typical phone photos from 5-10 MB down to 200-500 KB. */
+function compressImage(file, maxPx = 1280, quality = 0.82) {
+    return new Promise((resolve) => {
+        const img = new Image();
+        const blobUrl = URL.createObjectURL(file);
+        img.onload = () => {
+            URL.revokeObjectURL(blobUrl);
+            const { naturalWidth: w, naturalHeight: h } = img;
+            const scale = Math.min(1, maxPx / Math.max(w, h));
+            const canvas = document.createElement('canvas');
+            canvas.width = Math.round(w * scale);
+            canvas.height = Math.round(h * scale);
+            canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
+            canvas.toBlob(
+                (blob) => resolve(new File([blob], 'photo.jpg', { type: 'image/jpeg' })),
+                'image/jpeg',
+                quality,
+            );
+        };
+        img.onerror = () => { URL.revokeObjectURL(blobUrl); resolve(file); };
+        img.src = blobUrl;
+    });
+}
 import MapView from '../components/MapView';
 import { submitTicket } from '../services/api';
 
@@ -58,8 +84,26 @@ function CitizenReportPage() {
         toast('Listening… tap mic to stop', { icon: '🎙️' });
     };
 
+    // Restore photo from sessionStorage on mount (mobile camera wipes React state)
     useEffect(() => {
-        return () => { if (preview) URL.revokeObjectURL(preview); };
+        const stored = sessionStorage.getItem('pending_photo_b64');
+        if (stored) {
+            try {
+                const mime = stored.match(/data:(.*?);/)?.[1] || 'image/jpeg';
+                const binary = atob(stored.split(',')[1]);
+                const bytes = new Uint8Array(binary.length).map((_, i) => binary.charCodeAt(i));
+                const file = new File([bytes], 'photo.jpg', { type: mime });
+                setPhoto(file);
+                setPreview(stored); // base64 previews survive reloads
+            } catch {
+                sessionStorage.removeItem('pending_photo_b64');
+            }
+        }
+    }, []);
+
+    useEffect(() => {
+        // Revoke blob URLs only (base64 preview strings need no revocation)
+        return () => { if (preview && preview.startsWith('blob:')) URL.revokeObjectURL(preview); };
     }, [preview]);
 
     useEffect(() => {
@@ -68,20 +112,43 @@ function CitizenReportPage() {
     }, []);
 
     // --- Handlers ---
-    const handleFile = (e) => {
+    const handleFile = async (e) => {
         const file = e.target.files[0];
         if (!file) return;
-        if (file.size > MAX_FILE_BYTES) {
+
+        let compressed;
+        try {
+            toast.loading('Processing image…', { id: 'compress' });
+            compressed = await compressImage(file);
+            toast.dismiss('compress');
+        } catch {
+            toast.dismiss('compress');
+            compressed = file;
+        }
+
+        if (compressed.size > MAX_FILE_BYTES) {
             toast.error('Image too large. Max 5 MB.');
             return;
         }
-        setPhoto(file);
-        setPreview(URL.createObjectURL(file));
+
+        const previewUrl = URL.createObjectURL(compressed);
+        setPhoto(compressed);
+        setPreview(previewUrl);
+
+        // Persist to sessionStorage so state survives mobile camera app switching
+        try {
+            const reader = new FileReader();
+            reader.onload = () => {
+                try { sessionStorage.setItem('pending_photo_b64', reader.result); } catch {}
+            };
+            reader.readAsDataURL(compressed);
+        } catch {}
     };
 
     const clearPhoto = () => {
         setPhoto(null);
         setPreview(null);
+        sessionStorage.removeItem('pending_photo_b64');
     };
 
     const detectGPS = () => {
@@ -120,7 +187,6 @@ function CitizenReportPage() {
         setSubmitting(true);
         try {
             await submitTicket(fd);
-            setSubmitting(false);
             // Start morph animation
             setMorphState('morphing');
             setTimeout(() => setMorphState('success'), 650);
@@ -132,8 +198,13 @@ function CitizenReportPage() {
                 setCoords(null);
             }, 3200);
         } catch (err) {
-            const msg = err.response?.data?.error ?? 'Submission failed. Please try again.';
+            const msg =
+                err.code === 'ECONNABORTED'
+                    ? 'Upload is taking too long. Please retry on a stable connection.'
+                    : (err.response?.data?.error ?? 'Submission failed. Check your connection and try again.');
             toast.error(msg);
+            debugLog('submit:error', { status: err.response?.status, body: err.response?.data, msg: err.message });
+        } finally {
             setSubmitting(false);
         }
     };

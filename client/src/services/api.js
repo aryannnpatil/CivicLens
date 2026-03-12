@@ -3,6 +3,9 @@ import axios from 'axios';
 const API = axios.create({
     baseURL: import.meta.env.VITE_API_BASE_URL || '/api',
     timeout: 30000, // 30s — AI classification can take time
+    headers: {
+        'ngrok-skip-browser-warning': 'true',
+    },
 });
 
 // Attach admin JWT token if present
@@ -30,7 +33,11 @@ API.interceptors.response.use(
  * Submit a new civic issue report
  * @param {FormData} formData - Must contain: photo (File), longitude, latitude, description (optional)
  */
-export const submitTicket = (formData) => API.post('/tickets', formData);
+export const submitTicket = (formData) =>
+    API.post('/tickets', formData, {
+        // Upload + AI classification over ngrok can exceed the default 30s timeout.
+        timeout: 120000,
+    });
 
 /**
  * Fetch all tickets with optional filters

@@ -6,8 +6,8 @@ const mongoose = require('mongoose');
 const ticketRoutes = require('./src/routes/ticketsRoutes');
 const authRoutes = require('./src/routes/authRoutes');
 const azureTestRoutes = require('./src/routes/azureTestRoutes');
-const { seedTickets } = require('./src/models/ticketStore');
 const { seedAdmin } = require('./src/models/adminStore');
+const { attachWss } = require('./src/utils/wsServer');
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -38,7 +38,6 @@ app.get('/health', (req, res) => {
 // ========================
 // Start Server — connect MongoDB then listen
 // ========================
-seedTickets();
 seedAdmin();
 
 const MONGO_URI = process.env.MONGO_URI;
@@ -59,6 +58,9 @@ async function startServer() {
         console.log('Server running');
         console.log(`Listening on http://localhost:${PORT}`);
     });
+
+    // Attach WebSocket server to the same HTTP server
+    attachWss(server);
 
     server.on('error', (error) => {
         if (error.code === 'EADDRINUSE') {

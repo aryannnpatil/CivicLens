@@ -11,4 +11,15 @@ router.get('/tickets/:id', getTicketById);
 router.post('/tickets', upload.single('photo'), validatePostTicket, postTicket);
 router.patch('/tickets/:id', validatePatchTicket, patchTicketStatus);
 
+// Catch multer / upload errors and return JSON (prevents HTML 500 responses)
+router.use((err, req, res, next) => {
+    if (err && err.code) {
+        const msg = err.code === 'LIMIT_FILE_SIZE'
+            ? 'Image too large. Maximum size is 10 MB.'
+            : `Upload error: ${err.message}`;
+        return res.status(400).json({ success: false, error: msg });
+    }
+    next(err);
+});
+
 module.exports = router;

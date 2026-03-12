@@ -27,10 +27,55 @@ export function AuthProvider({ children }) {
     }, []);
 
     const login = useCallback(async (username, password) => {
-        const { data } = await API.post('/auth/login', { username, password });
-        localStorage.setItem('admin_token', data.token);
-        setAdmin(data.admin);
-        return data;
+        const doLogin = () => API.post('/auth/login', { username, password }, { timeout: 20000 });
+        const doLoginFetchFallback = async () => {
+            const ctrl = new AbortController();
+            const t = setTimeout(() => ctrl.abort(), 20000);
+            try {
+                const res = await fetch('/api/auth/login', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'ngrok-skip-browser-warning': 'true',
+                    },
+                    body: JSON.stringify({ username, password }),
+                    signal: ctrl.signal,
+                });
+
+                const data = await res.json();
+                if (!res.ok) {
+                    const err = new Error(data?.error || 'Login failed');
+                    err.response = { status: res.status, data };
+                    throw err;
+                }
+                return data;
+            } finally {
+                clearTimeout(t);
+            }
+        };
+
+        try {
+            const { data } = await doLogin();
+            localStorage.setItem('admin_token', data.token);
+            setAdmin(data.admin);
+            return data;
+        } catch (err) {
+            // ngrok/free-tunnel requests can occasionally fail transiently.
+            if (!err?.response) {
+                await new Promise((r) => setTimeout(r, 500));
+                let data;
+                try {
+                    ({ data } = await doLogin());
+                } catch (retryErr) {
+                    if (retryErr?.response) throw retryErr;
+                    data = await doLoginFetchFallback();
+                }
+                localStorage.setItem('admin_token', data.token);
+                setAdmin(data.admin);
+                return data;
+            }
+            throw err;
+        }
     }, []);
 
     const logout = useCallback(() => {

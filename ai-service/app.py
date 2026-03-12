@@ -27,6 +27,15 @@ SEVERITY_PROMPTS = [
     "extreme emergency or life-threatening"    # Score: 10
 ]
 
+
+@app.route('/health', methods=['GET'])
+def health():
+    return jsonify({
+        "status": "ok",
+        "service": "civiclens-ai",
+        "modelLoaded": classifier is not None
+    })
+
 @app.route('/classify', methods=['POST'])
 def classify_image():
     if 'image' not in request.files:

@@ -21,8 +21,15 @@ export default function AdminLogin() {
             await login(username, password);
             toast.success('Welcome, Admin');
             navigate('/admin', { replace: true });
-        } catch {
-            toast.error('Invalid credentials');
+        } catch (err) {
+            const status = err?.response?.status;
+            if (status === 401) {
+                toast.error('Invalid credentials — check your username and password.');
+            } else if (!err?.response) {
+                toast.error('Cannot reach server. Check your connection.');
+            } else {
+                toast.error(`Login failed (${status ?? 'unknown error'})`);
+            }
         } finally {
             setSubmitting(false);
         }

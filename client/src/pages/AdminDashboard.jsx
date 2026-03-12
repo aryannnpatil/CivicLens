@@ -6,7 +6,7 @@
  * ✅ Sortable & filterable ticket table (severity, status, category, date)
  * ✅ Heatmap map — markers colour-coded by severity score
  * ✅ Ticket detail modal — image, mini-map, status update dropdown
- * ✅ Auto-refresh every 15 seconds
+ * ✅ Real-time updates via WebSocket (falls back to 30 s poll on disconnect)
  * ✅ Liquid glass UI design
  */
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
@@ -15,6 +15,7 @@ import toast from "react-hot-toast";
 import MapView, { severityColor } from "../components/MapView";
 import { getTickets, updateTicketStatus } from "../services/api";
 import { useAuth } from "../context/AuthContext";
+import { debugLog } from "../utils/debug";
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
@@ -72,7 +73,14 @@ const STATUS_BADGE = {
   resolved: "bg-emerald-100 text-emerald-700",
 };
 
-const REFRESH_MS = 15_000;
+const REFRESH_MS = 30_000; // fallback poll when WS is disconnected
+
+// Derive WS URL from current origin (works with ngrok, localhost, any host)
+function getWsUrl() {
+  const wsProto = window.location.protocol === 'https:' ? 'wss' : 'ws';
+  // /ws path is proxied by Vite → backend; avoids collision with Vite HMR socket
+  return `${wsProto}://${window.location.host}/ws`;
+}
 
 // ─── Icon helper ─────────────────────────────────────────────────────────────
 
@@ -92,6 +100,7 @@ function AdminDashboard() {
   const [loading, setLoading] = useState(true);
   const [selectedTicket, setSelectedTicket] = useState(null);
   const [updatingStatus, setUpdatingStatus] = useState(false);
+  const [wsState, setWsState] = useState('connecting'); // 'connecting'|'open'|'closed'
   const [filters, setFilters] = useState({
     status: "",
     category: "",
@@ -99,6 +108,8 @@ function AdminDashboard() {
   });
   const [bounds, setBounds] = useState(null);
   const debounceRef = useRef(null);
+  const wsRef = useRef(null);
+  const wsRetryRef = useRef(null);
 
   // Jurisdiction-derived map props
   const jurisdiction = admin?.jurisdiction ?? null;
@@ -146,23 +157,90 @@ function AdminDashboard() {
           resolved: data.filter((t) => t.status === "resolved").length,
         },
       });
+      debugLog('fetchAll', { count: data.length, params });
     } catch (err) {
-      console.error("Dashboard fetch error:", err);
+      debugLog('fetchAll:error', err?.message);
     } finally {
       setLoading(false);
     }
   }, [filters, jurisdiction, bounds]);
 
+  // ── WebSocket real-time updates ─────────────────────────────────────────
+  useEffect(() => {
+    let destroyed = false;
+
+    function connect() {
+      if (destroyed) return;
+      const ws = new WebSocket(getWsUrl());
+      wsRef.current = ws;
+      setWsState('connecting');
+
+      ws.onopen = () => {
+        setWsState('open');
+        debugLog('ws:open', getWsUrl());
+      };
+
+      ws.onmessage = (event) => {
+        try {
+          const msg = JSON.parse(event.data);
+          debugLog('ws:message', msg); // visible in DevTools with ?debug=1
+          if (msg.type === 'new_ticket') {
+            // Prepend new ticket to state without a full fetch
+            setTickets((prev) => {
+              if (prev.some((t) => t.id === msg.payload.id || t._id === msg.payload._id)) return prev;
+              return [msg.payload, ...prev];
+            });
+            setStats((prev) => prev ? {
+              ...prev,
+              total: prev.total + 1,
+              byStatus: { ...prev.byStatus, open: (prev.byStatus.open || 0) + 1 },
+            } : prev);
+            toast('New issue reported', { icon: '📍', duration: 3000 });
+          } else if (msg.type === 'ticket_updated') {
+            const { id, status } = msg.payload;
+            setTickets((prev) =>
+              prev.map((t) => (t._id === id || t.id === id) ? { ...t, status } : t)
+            );
+            setSelectedTicket((prev) => prev && (prev._id === id || prev.id === id) ? { ...prev, status } : prev);
+          }
+          // 'ping' messages are intentionally ignored
+        } catch {}
+      };
+
+      ws.onclose = () => {
+        if (destroyed) return;
+        setWsState('closed');
+        debugLog('ws:closed — reconnecting in 5 s');
+        // Exponential back-off: retry after 5 s
+        wsRetryRef.current = setTimeout(connect, 5000);
+      };
+
+      ws.onerror = () => {
+        debugLog('ws:error');
+        ws.close();
+      };
+    }
+
+    connect();
+    return () => {
+      destroyed = true;
+      clearTimeout(wsRetryRef.current);
+      wsRef.current?.close();
+    };
+  }, []); // Only connect once on mount
+
+  // ── Initial data fetch + fallback poll when WS disconnected ──────────
   useEffect(() => {
     setLoading(true);
     fetchAll();
   }, [fetchAll]);
 
-  // Auto-refresh every 15 s
+  // Fallback poll: only active while WebSocket is disconnected
   useEffect(() => {
+    if (wsState === 'open') return; // WS connected — no need to poll
     const timer = setInterval(fetchAll, REFRESH_MS);
     return () => clearInterval(timer);
-  }, [fetchAll]);
+  }, [fetchAll, wsState]);
 
   // ── Status update ──
   const handleStatusChange = async (id, newStatus) => {

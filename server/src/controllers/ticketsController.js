@@ -1,10 +1,45 @@
 const { getAllTickets, createTicket, updateTicketStatus, getStats } = require('../models/ticketStore');
 const { uploadBufferToBlob } = require('../utils/blobUpload');
-const { classifyImageFromUrl } = require('../utils/aiClassifier');
+const { classifyImage, classifyImageFromUrl } = require('../utils/aiClassifier');
+const { broadcast } = require('../utils/wsServer');
 const TicketModel = require('../../models/Ticket');
 const mongoose = require('mongoose');
 
 const ALLOWED_STATUS = ['open', 'in_progress', 'resolved'];
+const ALLOWED_AI_CATEGORIES = new Set([
+    'pothole',
+    'garbage',
+    'broken_streetlight',
+    'waterlogging',
+    'other',
+    'unclassified',
+]);
+
+function normalizeAiCategory(rawCategory) {
+    if (!rawCategory || typeof rawCategory !== 'string') return 'unclassified';
+
+    const normalized = rawCategory.trim().toLowerCase();
+    const directMap = {
+        pothole: 'pothole',
+        'garbage dump': 'garbage',
+        garbage: 'garbage',
+        waterlogging: 'waterlogging',
+        'broken streetlight': 'broken_streetlight',
+        'electrical hazard': 'broken_streetlight',
+        'open/blocked drain': 'other',
+        'clean street': 'other',
+        other: 'other',
+        unclassified: 'unclassified',
+    };
+
+    if (directMap[normalized]) return directMap[normalized];
+    if (normalized.includes('pothole')) return 'pothole';
+    if (normalized.includes('garbage') || normalized.includes('trash')) return 'garbage';
+    if (normalized.includes('water')) return 'waterlogging';
+    if (normalized.includes('light') || normalized.includes('electric')) return 'broken_streetlight';
+
+    return 'other';
+}
 
 /** Haversine distance in km between two [lng, lat] points */
 function haversineKm(lng1, lat1, lng2, lat2) {
@@ -142,14 +177,31 @@ async function postTicket(req, res) {
     let aiConfidence = 0;
     let severityScore = 5;
     try {
-        const aiResult = await classifyImageFromUrl(photoUrl);
+        let aiResult;
+        if (uploadedPhoto) {
+            // Send the original buffer directly — Flask expects multipart 'image'
+            console.log('🤖 Sending image to Flask AI for classification...');
+            aiResult = await classifyImage(
+                uploadedPhoto.buffer,
+                uploadedPhoto.originalname,
+                uploadedPhoto.mimetype
+            );
+        } else {
+            // JSON-only submission (no file): AI requires a real image, skip classification
+            aiResult = await classifyImageFromUrl(photoUrl);
+        }
         if (aiResult && aiResult.category) {
-            aiCategory = aiResult.category;
+            aiCategory = normalizeAiCategory(aiResult.category);
             aiConfidence = aiResult.confidence ?? 0;
             severityScore = aiResult.severity ?? 5;
+            console.log(`✅ AI Result: ${aiCategory} (confidence: ${aiConfidence}, severity: ${severityScore})`);
         }
     } catch (aiErr) {
-        console.warn('AI classification failed, using fallback values:', aiErr.message);
+        console.warn('⚠️  AI classification failed, using fallback values:', aiErr.message);
+    }
+
+    if (!ALLOWED_AI_CATEGORIES.has(aiCategory)) {
+        aiCategory = 'other';
     }
 
     // ── 4. Save to MongoDB (if connected) ─────────────────────────
@@ -190,6 +242,9 @@ async function postTicket(req, res) {
         mongoId,
     });
 
+    // ── 6. Push real-time update to all admin dashboard clients ──
+    broadcast('new_ticket', ticket);
+
     return res.status(201).json({
         success: true,
         data: ticket,
@@ -222,6 +277,9 @@ async function patchTicketStatus(req, res) {
     if (!updated) {
         return res.status(404).json({ success: false, error: 'Ticket not found.' });
     }
+
+    // Push real-time status update to admin dashboard clients
+    broadcast('ticket_updated', { id, status });
 
     return res.status(200).json({ success: true, data: updated });
 }
