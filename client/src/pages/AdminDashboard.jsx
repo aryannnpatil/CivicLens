@@ -13,7 +13,7 @@ import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import toast from "react-hot-toast";
 import MapView, { severityColor } from "../components/MapView";
-import { getTickets, updateTicketStatus } from "../services/api";
+import { getTickets, updateTicketStatus, getStats } from "../services/api";
 import { useAuth } from "../context/AuthContext";
 import { debugLog } from "../utils/debug";
 
@@ -148,15 +148,22 @@ function AdminDashboard() {
       const ticketsRes = await getTickets(params);
       const data = ticketsRes.data?.data ?? [];
       setTickets(data);
-      // Compute stats locally from ticket data
-      setStats({
-        total: data.length,
-        byStatus: {
-          open: data.filter((t) => t.status === "open").length,
-          in_progress: data.filter((t) => t.status === "in_progress").length,
-          resolved: data.filter((t) => t.status === "resolved").length,
-        },
-      });
+      // Fetch real stats from server (not affected by pagination)
+      try {
+        const statsRes = await getStats();
+        const s = statsRes.data?.data ?? statsRes.data;
+        setStats({ total: s.total, byStatus: s.byStatus });
+      } catch {
+        // Fallback to counting from current page
+        setStats({
+          total: data.length,
+          byStatus: {
+            open: data.filter((t) => t.status === "open").length,
+            in_progress: data.filter((t) => t.status === "in_progress").length,
+            resolved: data.filter((t) => t.status === "resolved").length,
+          },
+        });
+      }
       debugLog('fetchAll', { count: data.length, params });
     } catch (err) {
       debugLog('fetchAll:error', err?.message);
@@ -169,6 +176,8 @@ function AdminDashboard() {
   useEffect(() => {
     let destroyed = false;
 
+    let retries = 0;
+
     function connect() {
       if (destroyed) return;
       const ws = new WebSocket(getWsUrl());
@@ -176,6 +185,7 @@ function AdminDashboard() {
       setWsState('connecting');
 
       ws.onopen = () => {
+        retries = 0;
         setWsState('open');
         debugLog('ws:open', getWsUrl());
       };
@@ -210,9 +220,10 @@ function AdminDashboard() {
       ws.onclose = () => {
         if (destroyed) return;
         setWsState('closed');
-        debugLog('ws:closed — reconnecting in 5 s');
-        // Exponential back-off: retry after 5 s
-        wsRetryRef.current = setTimeout(connect, 5000);
+        const delay = Math.min(1000 * 2 ** retries, 30000);
+        retries++;
+        debugLog('ws:closed — reconnecting in', delay, 'ms');
+        wsRetryRef.current = setTimeout(connect, delay);
       };
 
       ws.onerror = () => {
@@ -248,9 +259,9 @@ function AdminDashboard() {
     try {
       await updateTicketStatus(id, newStatus);
       setTickets((prev) =>
-        prev.map((t) => (t._id === id ? { ...t, status: newStatus } : t)),
+        prev.map((t) => (t._id === id || t.id === id) ? { ...t, status: newStatus } : t),
       );
-      if (selectedTicket?._id === id) {
+      if (selectedTicket?._id === id || selectedTicket?.id === id) {
         setSelectedTicket((prev) => ({ ...prev, status: newStatus }));
       }
       toast.success("Status updated!");
@@ -324,7 +335,7 @@ function AdminDashboard() {
               <div className="text-right hidden sm:block">
                 <p className="text-xs font-semibold">Admin Panel</p>
                 <p className="text-[10px] text-slate-500">
-                  Auto-refresh {Math.round(REFRESH_MS / 1000)}s
+                  {wsState === 'open' ? '● Live' : `Auto-refresh ${Math.round(REFRESH_MS / 1000)}s`}
                 </p>
               </div>
               <div className="w-10 h-10 rounded-full bg-primary/20 border-2 border-white flex items-center justify-center">
@@ -355,7 +366,7 @@ function AdminDashboard() {
             iconBg="bg-slate-100 text-slate-600"
             accent="hover:border-primary/30"
             barColor="bg-primary"
-            barWidth="w-full opacity-60"
+            barPct={100}
           />
           <StatCard
             label="Open"
@@ -364,11 +375,6 @@ function AdminDashboard() {
             iconBg="bg-amber-50 text-amber-600"
             accent="hover:border-amber-400/30"
             barColor="bg-amber-400"
-            barWidth={
-              totalTickets
-                ? `w-[${Math.round((openCount / totalTickets) * 100)}%]`
-                : "w-0"
-            }
             barPct={
               totalTickets ? Math.round((openCount / totalTickets) * 100) : 0
             }
@@ -380,11 +386,6 @@ function AdminDashboard() {
             iconBg="bg-blue-50 text-blue-600"
             accent="hover:border-blue-400/30"
             barColor="bg-blue-400"
-            barWidth={
-              totalTickets
-                ? `w-[${Math.round((inProgressCount / totalTickets) * 100)}%]`
-                : "w-0"
-            }
             barPct={
               totalTickets
                 ? Math.round((inProgressCount / totalTickets) * 100)
@@ -398,11 +399,6 @@ function AdminDashboard() {
             iconBg="bg-emerald-50 text-emerald-600"
             accent="hover:border-emerald-400/30"
             barColor="bg-emerald-400"
-            barWidth={
-              totalTickets
-                ? `w-[${Math.round((resolvedCount / totalTickets) * 100)}%]`
-                : "w-0"
-            }
             barPct={
               totalTickets
                 ? Math.round((resolvedCount / totalTickets) * 100)

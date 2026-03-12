@@ -92,10 +92,31 @@ function getStats() {
     return { total, byStatus, byCategory, avgSeverity };
 }
 
+/** Bulk-load MongoDB documents into the in-memory store (called on startup). */
+function loadFromMongo(docs) {
+    for (const doc of docs) {
+        const id = String(doc._id);
+        tickets.push({
+            id,
+            _id: id,
+            description: doc.description || '',
+            photoUrl: doc.photoUrl,
+            location: doc.location,
+            aiCategory: doc.aiCategory || 'unclassified',
+            aiConfidence: doc.aiConfidence ?? 0,
+            severityScore: doc.severityScore ?? 5,
+            status: doc.status || 'open',
+            createdAt: doc.createdAt ? new Date(doc.createdAt).toISOString() : new Date().toISOString(),
+        });
+    }
+    if (docs.length) console.log(`📦 Loaded ${docs.length} tickets from MongoDB into memory`);
+}
+
 module.exports = {
     seedTickets,
     getAllTickets,
     createTicket,
     updateTicketStatus,
     getStats,
+    loadFromMongo,
 };

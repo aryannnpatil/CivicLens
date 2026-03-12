@@ -7,6 +7,7 @@ const ticketRoutes = require('./src/routes/ticketsRoutes');
 const authRoutes = require('./src/routes/authRoutes');
 const azureTestRoutes = require('./src/routes/azureTestRoutes');
 const { seedAdmin } = require('./src/models/adminStore');
+const { loadFromMongo } = require('./src/models/ticketStore');
 const { attachWss } = require('./src/utils/wsServer');
 
 const app = express();
@@ -47,6 +48,10 @@ async function startServer() {
         try {
             await mongoose.connect(MONGO_URI);
             console.log('MongoDB connected');
+            // Load existing tickets into in-memory store
+            const TicketModel = require('./models/Ticket');
+            const docs = await TicketModel.find().lean();
+            loadFromMongo(docs);
         } catch (err) {
             console.error('MongoDB connection failed — running without persistence:', err.message);
         }

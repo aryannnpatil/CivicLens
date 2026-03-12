@@ -101,19 +101,29 @@ function getTickets(req, res) {
         tickets = tickets.filter((ticket) => ticket.aiCategory === category);
     }
 
-    // sort=severity → severityScore desc; no sort → createdAt desc
-    const sortMap = { severity: 'severityScore' };
-    const resolvedField = sort ? (sortMap[sort] || sort) : 'createdAt';
-
+    // Parse Mongoose-style sort: "-severityScore" → field="severityScore", desc=true
     const sortableFields = new Set(['severityScore', 'createdAt']);
-    if (sortableFields.has(resolvedField)) {
-        tickets.sort((a, b) => {
-            if (resolvedField === 'createdAt') {
-                return (new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-            }
-            return (b[resolvedField] - a[resolvedField]);
-        });
+    let sortField = 'createdAt';
+    let sortDesc = true;
+    if (sort) {
+        const desc = sort.startsWith('-');
+        const raw = desc ? sort.slice(1) : sort;
+        const sortMap = { severity: 'severityScore' };
+        const mapped = sortMap[raw] || raw;
+        if (sortableFields.has(mapped)) {
+            sortField = mapped;
+            sortDesc = desc;
+        }
     }
+    tickets.sort((a, b) => {
+        let cmp;
+        if (sortField === 'createdAt') {
+            cmp = new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
+        } else {
+            cmp = (a[sortField] ?? 0) - (b[sortField] ?? 0);
+        }
+        return sortDesc ? -cmp : cmp;
+    });
 
     // Pagination
     const total = tickets.length;
