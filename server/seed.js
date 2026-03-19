@@ -5,7 +5,7 @@ const Ticket = require('./models/Ticket');
 const seedTickets = [
     {
         description: 'Large pothole at the main entrance of Sector 5.',
-        photoUrl: 'https://example.com/pothole1.jpg',
+        photoUrl: '/images/pothole-placeholder.jpg',
         location: {
             type: 'Point',
             coordinates: [88.4277, 22.5726] 
@@ -17,7 +17,7 @@ const seedTickets = [
     },
     {
         description: 'Broken streetlight near the park.',
-        photoUrl: 'https://example.com/light1.jpg',
+        photoUrl: '/images/electric.jpg',
         location: {
             type: 'Point',
             coordinates: [88.4332, 22.5801]
@@ -29,7 +29,7 @@ const seedTickets = [
     },
     {
         description: 'Garbage pile-up on the sidewalk.',
-        photoUrl: 'https://example.com/garbage1.jpg',
+        photoUrl: '/images/garbage1.jpg',
         location: {
             type: 'Point',
             coordinates: [88.4201, 22.5655]
@@ -41,7 +41,7 @@ const seedTickets = [
     },
     {
         description: 'Waterlogging issue near the subway entrance.',
-        photoUrl: 'https://example.com/water1.jpg',
+        photoUrl: '/images/water-cloged.jpg',
         location: {
             type: 'Point',
             coordinates: [88.4350, 22.5710]
@@ -52,13 +52,13 @@ const seedTickets = [
         status: 'open'
     },
     {
-        description: 'Damaged pavement causing tripping hazard.',
-        photoUrl: 'https://example.com/pavement1.jpg',
+        description: 'Another garbage dump causing smell.',
+        photoUrl: '/images/garbage2.jpg',
         location: {
             type: 'Point',
             coordinates: [88.4250, 22.5750]
         },
-        aiCategory: 'other',
+        aiCategory: 'garbage',
         aiConfidence: 0.70,
         severityScore: 4,
         status: 'resolved'

@@ -1,0 +1,15 @@
+services:
+  ai-service:
+    build: 
+      context: ./ai-service
+    ports:
+      - "5000:5000"
+    environment:
+      - FLASK_ENV=production
+    restart: unless-stopped
+    # Use a volume to cache the Hugging Face model so restarts are fast
+    volumes:
+      - huggingface_cache:/root/.cache/huggingface
+
+volumes:
+  huggingface_cache:

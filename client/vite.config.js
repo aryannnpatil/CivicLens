@@ -15,6 +15,10 @@ export default defineConfig({
         // of which host the browser is connected to (ngrok, LAN IP, etc.)
         headers: { origin: 'http://localhost:5173' },
       },
+      '/images': {
+        target: 'http://localhost:3001',
+        changeOrigin: true,
+      },
       '/ws': {
         target: 'ws://localhost:3001',
         ws: true,

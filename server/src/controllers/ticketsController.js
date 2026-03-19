@@ -207,7 +207,11 @@ async function postTicket(req, res) {
             console.log(`✅ AI Result: ${aiCategory} (confidence: ${aiConfidence}, severity: ${severityScore})`);
         }
     } catch (aiErr) {
-        console.warn('⚠️  AI classification failed, using fallback values:', aiErr.message);
+        if (aiErr.code === 'ECONNREFUSED' || aiErr.code === 'ETIMEDOUT') {
+            console.warn(`WARNING: AI Service Unreachable at localhost:5000. Is the Docker container running?`);
+        } else {
+            console.warn('⚠️  AI classification failed, using fallback values:', aiErr.message);
+        }
     }
 
     if (!ALLOWED_AI_CATEGORIES.has(aiCategory)) {

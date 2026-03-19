@@ -338,7 +338,7 @@ function CitizenReportPage() {
                             className="w-full bg-transparent border-none outline-none focus:ring-0 text-slate-900 p-3 min-h-[140px] placeholder:text-slate-400 text-base resize-none"
                         />
                         <div className="flex items-center justify-between p-2">
-                            <button
+                            {/* <button
                                 type="button"
                                 onClick={toggleVoice}
                                 className={`flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-full transition-all ${
@@ -350,7 +350,7 @@ function CitizenReportPage() {
                             >
                                 <Icon name={listening ? 'mic_off' : 'mic'} className="text-[16px]" />
                                 {listening ? 'Stop' : 'Voice Input'}
-                            </button>
+                            </button> */}
                             <span className="text-[10px] font-bold tracking-wider text-slate-400 bg-slate-100 px-2 py-1 rounded-full">
                                 {description.length} / 500
                             </span>
