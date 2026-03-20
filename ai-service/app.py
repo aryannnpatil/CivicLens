@@ -50,24 +50,62 @@ def classify_image():
     final_category = LABEL_MAPPING[top_cat['label']]
     confidence = top_cat['score']
 
-    # 2. Identify Severity (Zero-shot against severity prompts)
-    sev_preds = classifier(img, candidate_labels=SEVERITY_PROMPTS)
-    top_sev_label = sev_preds[0]['label']
+    # 2. Analyze Visual Severity - How bad is THIS specific problem?
+    # Use more granular and specific severity descriptions
+    severity_descriptions = [
+        # 1-2: Minimal
+        "a tiny, barely visible defect or mark with no real impact",
+        "a very minor issue that is hardly noticeable and poses no risk",
+        # 3-4: Low
+        "a small problem that is visible but causes minimal inconvenience",
+        "a minor issue that is noticeable but not concerning",
+        # 5-6: Medium
+        "a moderate problem with visible damage that needs attention",
+        "a clear issue with noticeable damage or deterioration",
+        # 7-8: High
+        "a significant problem with substantial damage requiring urgent repair",
+        "a serious issue with major damage posing safety concerns",
+        # 9-10: Critical
+        "a severe and dangerous problem with extensive damage requiring immediate action",
+        "a catastrophic situation with extreme damage posing imminent danger"
+    ]
     
-    # Map the text label to a numeric score out of 10
-    severity_map = {
-        SEVERITY_PROMPTS[0]: 3,  # Minor
-        SEVERITY_PROMPTS[1]: 6,  # Moderate
-        SEVERITY_PROMPTS[2]: 8,  # Severe
-        SEVERITY_PROMPTS[3]: 10  # Extreme
-    }
-    severity_score = severity_map[top_sev_label]
+    # Use zero-shot classification to determine visual severity
+    sev_preds = classifier(img, candidate_labels=severity_descriptions)
+    
+    # Get top 3 predictions and their scores
+    top_3_severities = sev_preds[:3]
+    
+    # Calculate weighted severity score based on top predictions
+    total_weight = 0
+    weighted_sum = 0
+    
+    for pred in top_3_severities:
+        severity_index = severity_descriptions.index(pred['label'])
+        severity_value = severity_index + 1  # Convert 0-9 index to 1-10 score
+        weight = pred['score']
+        
+        weighted_sum += severity_value * weight
+        total_weight += weight
+    
+    # Calculate final severity as weighted average
+    if total_weight > 0:
+        severity_score = round(weighted_sum / total_weight)
+    else:
+        severity_score = 5  # Default to medium if something goes wrong
+    
+    # Get the confidence of the top severity prediction
+    severity_confidence = top_3_severities[0]['score']
+    
+    # Ensure severity is between 1 and 10
+    severity_score = max(1, min(10, severity_score))
 
     return jsonify({
         "success": True,
         "category": final_category,
         "confidence": round(float(confidence), 2),
-        "severity": severity_score
+        "severity": severity_score,
+        "severity_confidence": round(float(severity_confidence), 2)
     })
 
 if __name__ == '__main__':
